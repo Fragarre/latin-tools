@@ -6,9 +6,18 @@ from openai import OpenAI
 import math
 
 # --- Cargar API Key ---
+# try:
+#     config = toml.load("config.toml")
+#     api_key = config["openai"]["api_key"]
+#     client = OpenAI(api_key=api_key)
+# except Exception as e:
+#     st.error(f"❌ No se pudo cargar la API key: {e}")
+#     st.stop()
+
+# --- cargar api key desde secrets en streamlit cloud ---
+# --- OPENAI_API_KEY = "api-key-aquí" ---
 try:
-    config = toml.load("config.toml")
-    api_key = config["openai"]["api_key"]
+    api_key = st.secrets["OPENAI_API_KEY"]
     client = OpenAI(api_key=api_key)
 except Exception as e:
     st.error(f"❌ No se pudo cargar la API key: {e}")
@@ -45,7 +54,7 @@ if input_tipo == "Texto manual":
         if "Latín" in modo
         else "Ejemplo: Toda la Galia está dividida en tres partes..."
     )
-    texto_entrada = st.text_area("Texto a traducir: ", placeholder=placeholder, height=200, max_chars=3000)
+    texto_entrada = st.text_area("Texto a traducir: ", placeholder=placeholder, height=200, max_chars=5000)
     st.markdown("**Después de introducir el texto, pulsa 'control + enter'**")
 else:
     archivo = st.file_uploader("Sube un archivo .txt (máx. 30.000 caracteres)", type=["txt"])
