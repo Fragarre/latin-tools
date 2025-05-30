@@ -115,6 +115,10 @@ def load_and_train_model(ngram_min, ngram_max):
 
     vectorizer = TfidfVectorizer(analyzer='char', ngram_range=(ngram_min, ngram_max))
     X = vectorizer.fit_transform(texts)
+
+    # Agregar st.write para mostrar el total de n-gramas generados
+    st.write("Total de n-gramas generados:", len(vectorizer.get_feature_names_out()))
+
     st.subheader("Análisis de Varianza para SVD")
     svd_model, varianza, mejor_n = plot_svd_variance_streamlit(X, max_components=150, threshold=0.95)
 
