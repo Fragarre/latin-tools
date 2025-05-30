@@ -15,6 +15,7 @@ from umap import UMAP
 import plotly.express as px
 import pandas as pd
 import shutil
+import plotly.graph_objects as go
 
 # --- Borrar automáticamente ./data al iniciar la app --- #
 def clear_data_folder():
@@ -24,6 +25,67 @@ def clear_data_folder():
     os.makedirs(data_path)
 
 clear_data_folder()
+
+# --- funcion para ver cambios en varianza ---
+def plot_svd_variance_streamlit(X, max_components=200, threshold=0.95, random_state=42):
+    """
+    Aplica TruncatedSVD a X, genera un gráfico interactivo en Streamlit y devuelve el modelo y el número óptimo de componentes.
+
+    Parámetros:
+        X               - matriz dispersa o densa (salida de TfidfVectorizer)
+        max_components  - número máximo de componentes a considerar
+        threshold       - proporción de varianza explicada deseada (ej. 0.95 para 95%)
+        random_state    - semilla para reproducibilidad
+
+    Devuelve:
+        svd             - modelo TruncatedSVD ajustado
+        var_acumulada   - array de varianza acumulada
+        optimal_n       - número mínimo de componentes que alcanzan el threshold
+    """
+    # Entrenamiento SVD
+    svd = TruncatedSVD(n_components=max_components, random_state=random_state)
+    X_reduced = svd.fit_transform(X)
+    var_acumulada = np.cumsum(svd.explained_variance_ratio_)
+
+    # Cálculo del n óptimo
+    optimal_n = np.argmax(var_acumulada >= threshold) + 1
+
+    # Gráfico Plotly
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(
+        x=list(range(1, max_components + 1)),
+        y=var_acumulada,
+        mode='lines+markers',
+        name='Varianza acumulada'
+    ))
+
+    fig.add_hline(
+        y=threshold,
+        line_dash="dash",
+        line_color="red",
+        annotation_text=f"{int(threshold * 100)}% varianza explicada",
+        annotation_position="bottom right"
+    )
+
+    fig.add_vline(
+        x=optimal_n,
+        line_dash="dash",
+        line_color="blue",
+        annotation_text=f"n_components = {optimal_n}",
+        annotation_position="top left"
+    )
+
+    fig.update_layout(
+        title='Selección de n_components para TruncatedSVD',
+        xaxis_title='Número de componentes',
+        yaxis_title='Varianza acumulada explicada',
+        template='plotly_white',
+        height=500
+    )
+
+    st.plotly_chart(fig, use_container_width=True)
+
+    return svd, var_acumulada, optimal_n
 
 st.subheader("Análisis estilométrico (Recargar página para nuevo análisis)")
 # --- Función para extraer el archivo ZIP --- #
@@ -53,7 +115,11 @@ def load_and_train_model(ngram_min, ngram_max):
 
     vectorizer = TfidfVectorizer(analyzer='char', ngram_range=(ngram_min, ngram_max))
     X = vectorizer.fit_transform(texts)
-    svd = TruncatedSVD(n_components=50, random_state=42)
+    st.subheader("Análisis de Varianza para SVD")
+    svd_model, varianza, mejor_n = plot_svd_variance_streamlit(X, max_components=150, threshold=0.95)
+
+    st.success(f"Para explicar al menos el 95% de la varianza, se toman {mejor_n} componentes.")
+    svd = TruncatedSVD(n_components=mejor_n, random_state=42)
     X_reduced = svd.fit_transform(X)
 
     clf = NearestCentroid()
@@ -99,11 +165,22 @@ if uploaded_zip is not None:
     clf, vectorizer, svd, texts, labels, filenames, X_reduced = load_and_train_model(ngram_min, ngram_max)
 
     st.write("Generando la matriz de confusión...")
+    # Predicción y matriz de confusión
     y_pred = clf.predict(X_reduced)
     cm = confusion_matrix(labels, y_pred, labels=clf.classes_)
-    cm_display = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=clf.classes_)
-    cm_display.plot(cmap=plt.cm.Blues)
-    st.pyplot(plt.gcf(), use_container_width=True)
+    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=clf.classes_)
+
+    # Crear el plot y personalizar
+    fig, ax = plt.subplots(figsize=(8, 6))  # Puedes ajustar el tamaño según tus necesidades
+    disp.plot(cmap=plt.cm.Blues, ax=ax, xticks_rotation=45)
+
+    # Etiquetas personalizadas en español
+    ax.set_xlabel("Etiqueta predicha", fontsize=10)
+    ax.set_ylabel("Etiqueta real", fontsize=10)
+    ax.tick_params(axis='both', labelsize=8)  # Tamaño más pequeño para las etiquetas
+
+    # Mostrar en Streamlit
+    st.pyplot(fig, use_container_width=True)
 
     st.write("Generando visualizaciones...")
     n_samples = len(X_reduced)
