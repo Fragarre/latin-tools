@@ -1,0 +1,12 @@
+streamlit
+toml
+tiktoken
+openai
+numpy
+scikit-learn
+pandas
+matplotlib
+umap-learn
+plotly
+selenium
+webdriver-manager
